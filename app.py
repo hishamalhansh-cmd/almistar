@@ -17,8 +17,9 @@ app = Flask(__name__)
 app.secret_key = "adam_secret_key_2026"
 
 # ================= الإعدادات =================
-SENDER_EMAIL = os.environ.get("HISHAMALHANSH@GMAIL.COM", "")
-SENDER_APP_PASSWORD = os.environ.get("dnwu yrac sbxs cplk", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
+SENDER_APP_PASSWORD = os.environ.get("SENDER_APP_PASSWORD", "")
+
 CONTACT_PHONE = "009647864145165"
 CONTACT_EMAIL = "hishamalhanash@gmail.com"
 
@@ -98,7 +99,7 @@ def get_client_ip():
 def clean_old_attempts(storage, window_seconds):
     now = time.time()
     expired_keys = []
-    for key, timestamps in storage.items():
+    for key, timestamps in list(storage.items()):
         filtered = [t for t in timestamps if now - t <= window_seconds]
         if filtered:
             storage[key] = filtered
@@ -484,6 +485,10 @@ def log_admin_action(action, target_name="", details=""):
 # ================= إرسال الإيميل =================
 def send_mail(to_email, subject, body):
     try:
+        if not SENDER_EMAIL or not SENDER_APP_PASSWORD:
+            print("MAIL ERROR: missing SENDER_EMAIL or SENDER_APP_PASSWORD")
+            return False
+
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = to_email
@@ -2369,32 +2374,86 @@ def edit_profile():
         bio = sanitize_input(request.form.get("bio", ""), 500)
 
         if not name or not phone or not email:
-            return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">الاسم والهاتف والبريد الإلكتروني حقول مطلوبة</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+            return render_template_string(
+                STYLE + settings_corner() + """
+                <div class="container">
+                    <div class="msg">الاسم والهاتف والبريد الإلكتروني حقول مطلوبة</div>
+                    <a href="/edit-profile"><button>رجوع</button></a>
+                </div>
+                """
+            )
 
         if not valid_email(email):
-            return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">البريد الإلكتروني غير صحيح</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+            return render_template_string(
+                STYLE + settings_corner() + """
+                <div class="container">
+                    <div class="msg">البريد الإلكتروني غير صحيح</div>
+                    <a href="/edit-profile"><button>رجوع</button></a>
+                </div>
+                """
+            )
 
         if not valid_phone(phone):
-            return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">رقم الهاتف غير صحيح</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+            return render_template_string(
+                STYLE + settings_corner() + """
+                <div class="container">
+                    <div class="msg">رقم الهاتف غير صحيح</div>
+                    <a href="/edit-profile"><button>رجوع</button></a>
+                </div>
+                """
+            )
 
         if governorate and governorate not in IRAQ_GOVERNORATES:
-            return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">المحافظة غير صحيحة</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+            return render_template_string(
+                STYLE + settings_corner() + """
+                <div class="container">
+                    <div class="msg">المحافظة غير صحيحة</div>
+                    <a href="/edit-profile"><button>رجوع</button></a>
+                </div>
+                """
+            )
 
         if section and section not in SPECIALTIES:
-            return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">الاختصاص غير صحيح</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+            return render_template_string(
+                STYLE + settings_corner() + """
+                <div class="container">
+                    <div class="msg">الاختصاص غير صحيح</div>
+                    <a href="/edit-profile"><button>رجوع</button></a>
+                </div>
+                """
+            )
 
         with get_db() as con:
             cur = con.cursor()
-            exists = cur.execute("SELECT id FROM users WHERE (phone=? OR email=?) AND id != ?", (phone, email, user["id"])).fetchone()
+            exists = cur.execute(
+                "SELECT id FROM users WHERE (phone=? OR email=?) AND id != ?",
+                (phone, email, user["id"])
+            ).fetchone()
+
             if exists:
-                return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">رقم الهاتف أو البريد الإلكتروني مستخدم من حساب آخر</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+                return render_template_string(
+                    STYLE + settings_corner() + """
+                    <div class="container">
+                        <div class="msg">رقم الهاتف أو البريد الإلكتروني مستخدم من حساب آخر</div>
+                        <a href="/edit-profile"><button>رجوع</button></a>
+                    </div>
+                    """
+                )
 
             new_profile_pic = user["profile_pic"]
             profile_file = request.files.get("profile_pic")
+
             if profile_file and profile_file.filename:
                 valid_img, msg = validate_uploaded_image(profile_file)
                 if not valid_img:
-                    return render_template_string(STYLE + settings_corner() + f"""<div class="container"><div class="msg">{msg}</div><a href="/edit-profile"><button>رجوع</button></a></div>""")
+                    return render_template_string(
+                        STYLE + settings_corner() + f"""
+                        <div class="container">
+                            <div class="msg">{msg}</div>
+                            <a href="/edit-profile"><button>رجوع</button></a>
+                        </div>
+                        """
+                    )
 
                 saved_profile = save_uploaded_file(profile_file)
                 if saved_profile:
@@ -2409,54 +2468,70 @@ def edit_profile():
             con.commit()
 
         session["user"] = name
-        return render_template_string(STYLE + settings_corner() + """<div class="container"><div class="msg">تم تحديث البروفايل بنجاح</div><a href="/settings"><button>الرجوع للإعدادات</button></a></div>""")
+        return render_template_string(
+            STYLE + settings_corner() + """
+            <div class="container">
+                <div class="msg">تم تحديث البروفايل بنجاح</div>
+                <a href="/settings"><button>الرجوع للإعدادات</button></a>
+            </div>
+            """
+        )
 
-    profile_preview = f'<img src="{url_for("uploaded_file", filename=user["profile_pic"])}" class="profile-img-large" alt="profile">' if user["profile_pic"] else '<div class="profile-placeholder-large">👤</div>'
+    profile_preview = (
+        f'<img src="{url_for("uploaded_file", filename=user["profile_pic"])}" class="profile-img-large" alt="profile">'
+        if user["profile_pic"]
+        else '<div class="profile-placeholder-large">👤</div>'
+    )
+
     selected_group = get_main_group_by_specialty(user["section"] or "")
     group_options = build_main_groups_options(selected_group)
     gov_options = build_governorates_options(user["governorate"] or "")
     specialty_options = build_specialties_options(user["section"] or "", selected_group)
 
-    return render_template_string(STYLE + settings_corner() + f"""
-    <div class="container">
-        <a href="/settings"><button>رجوع</button></a>
-        <h2>تعديل البروفايل</h2>
-        {profile_preview}
-        <form method="post" enctype="multipart/form-data">
-            <input name="name" value="{user['name'] or ''}" placeholder="الاسم الكامل" required>
-            <input name="phone" value="{user['phone'] or '+964'}" placeholder="+964XXXXXXXXXX" required>
-            <input name="email" value="{user['email'] or ''}" placeholder="البريد الإلكتروني" required>
+    return render_template_string(
+        STYLE + settings_corner() + f"""
+        <div class="container">
+            <a href="/settings"><button>رجوع</button></a>
+            <h2>تعديل البروفايل</h2>
+            {profile_preview}
+            <form method="post" enctype="multipart/form-data">
+                <input name="name" value="{user['name'] or ''}" placeholder="الاسم الكامل" required>
+                <input name="phone" value="{user['phone'] or '+964'}" placeholder="+964XXXXXXXXXX" required>
+                <input name="email" value="{user['email'] or ''}" placeholder="البريد الإلكتروني" required>
 
-            <label>القسم الرئيسي</label>
-            <select name="main_group" id="main_group" onchange="updateSpecialties()">
-                <option value="">اختر القسم الرئيسي</option>
-                {group_options}
-            </select>
+                <label>القسم الرئيسي</label>
+                <select name="main_group" id="main_group" onchange="updateSpecialties()">
+                    <option value="">اختر القسم الرئيسي</option>
+                    {group_options}
+                </select>
 
-            <label>الاختصاص</label>
-            <select name="section" id="section">{specialty_options}</select>
+                <label>الاختصاص</label>
+                <select name="section" id="section">{specialty_options}</select>
 
-            <label>المحافظة</label>
-            <select name="governorate" required>
-                <option value="">اختر المحافظة</option>
-                {gov_options}
-            </select>
+                <label>المحافظة</label>
+                <select name="governorate" required>
+                    <option value="">اختر المحافظة</option>
+                    {gov_options}
+                </select>
 
-            <input name="city" value="{user['city'] or ''}" placeholder="المدينة / المنطقة">
-            <input name="exp" value="{user['exp'] or ''}" placeholder="سنوات الخبرة">
-            <textarea name="bio" placeholder="نبذة عنك">{user['bio'] or ''}</textarea>
-            <label>تغيير الصورة الشخصية</label>
-            <input type="file" name="profile_pic" accept=".png,.jpg,.jpeg,.gif,.webp">
-            <button>حفظ التعديلات</button>
-        </form>
-        <a href="/change-password"><button>تغيير كلمة المرور</button></a>
-        <a href="/manage-work-images/{user['id']}"><button>إدارة صور الأعمال</button></a>
-        <a href="/delete-account"><button style="background:red;color:white;">حذف الحساب</button></a>
-    </div>
-    {specialty_script(user['section'] or '')}
-    """)
+                <input name="city" value="{user['city'] or ''}" placeholder="المدينة / المنطقة">
+                <input name="exp" value="{user['exp'] or ''}" placeholder="سنوات الخبرة">
+                <textarea name="bio" placeholder="نبذة عنك">{user['bio'] or ''}</textarea>
+
+                <label>تغيير الصورة الشخصية</label>
+                <input type="file" name="profile_pic" accept=".png,.jpg,.jpeg,.gif,.webp">
+
+                <button>حفظ التعديلات</button>
+            </form>
+
+            <a href="/change-password"><button>تغيير كلمة المرور</button></a>
+            <a href="/manage-work-images/{user['id']}"><button>إدارة صور الأعمال</button></a>
+            <a href="/delete-account"><button style="background:red;color:white;">حذف الحساب</button></a>
+        </div>
+        {specialty_script(user['section'] or '')}
+        """
+    )
 
 
-
-   if __name__ == "__main__":
+if __name__ == "__main__":
     app.run()
